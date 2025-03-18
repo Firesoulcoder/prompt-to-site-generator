@@ -2,8 +2,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { Button } from './ui/button';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
 interface WebsitePreviewProps {
   htmlContent: string;
@@ -13,10 +14,12 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ htmlContent }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [connectionIssue, setConnectionIssue] = useState(false);
 
   const loadPreview = () => {
     setLoading(true);
     setError(null);
+    setConnectionIssue(false);
     
     try {
       if (iframeRef.current && htmlContent) {
@@ -43,12 +46,26 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ htmlContent }) => {
       }
     } catch (err: any) {
       console.error('Error rendering preview:', err);
+      
+      // Check if it's a network/connection issue
+      if (err.message?.includes('network') || 
+          err.message?.includes('connection') ||
+          err.message?.includes('DNS') ||
+          err.name === 'NetworkError') {
+        setConnectionIssue(true);
+      }
+      
       setError(err.message || 'Failed to load preview');
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    // Check general connectivity
+    if (!navigator.onLine) {
+      setConnectionIssue(true);
+    }
+    
     loadPreview();
   }, [htmlContent]);
 
@@ -71,9 +88,35 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ htmlContent }) => {
           </div>
         )}
         
-        {error && (
+        {connectionIssue && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 z-10 p-6">
-            <p className="text-destructive mb-4">Error: {error}</p>
+            <Alert variant="destructive" className="max-w-md mb-4">
+              <WifiOff className="h-4 w-4 mr-2" />
+              <AlertTitle>Connection Issue Detected</AlertTitle>
+              <AlertDescription>
+                There appears to be a problem connecting to our services. This could be due to network connectivity or our servers may be temporarily unavailable.
+              </AlertDescription>
+            </Alert>
+            
+            <p className="text-sm text-muted-foreground mb-4">The preview will still work, but saving your projects may not be available right now.</p>
+            
+            <Button onClick={handleReload} variant="outline" className="gap-2">
+              <Wifi className="h-4 w-4" />
+              Check Connection
+            </Button>
+          </div>
+        )}
+        
+        {error && !connectionIssue && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 z-10 p-6">
+            <Alert variant="destructive" className="max-w-md mb-4">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              <AlertTitle>Error Loading Preview</AlertTitle>
+              <AlertDescription>
+                {error}
+              </AlertDescription>
+            </Alert>
+            
             <Button onClick={handleReload} variant="outline">
               <RefreshCw className="h-4 w-4 mr-2" />
               Reload Preview

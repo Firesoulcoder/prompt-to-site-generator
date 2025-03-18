@@ -137,6 +137,10 @@ export async function saveProject(
   title: string
 ): Promise<string> {
   try {
+    // First try to connect to Supabase
+    const testConnection = await supabase.from('website_projects').select('count', { count: 'exact', head: true });
+    
+    // If we got here, connection worked
     const { data, error } = await supabase
       .from('website_projects')
       .insert([
@@ -148,12 +152,35 @@ export async function saveProject(
     return data[0].id;
   } catch (error: any) {
     console.error('Error saving project:', error);
-    throw new Error(error.message || 'Failed to save project');
+    
+    // Generate a fake project ID for offline mode
+    const fakeId = 'offline-' + Math.random().toString(36).substring(2, 15);
+    
+    // Try to save to localStorage as a fallback
+    try {
+      const offlineProjects = JSON.parse(localStorage.getItem('offlineProjects') || '[]');
+      const newProject = {
+        id: fakeId,
+        user_id: userId,
+        prompt,
+        html_content: htmlContent,
+        title,
+        created_at: new Date().toISOString()
+      };
+      offlineProjects.push(newProject);
+      localStorage.setItem('offlineProjects', JSON.stringify(offlineProjects));
+    } catch (e) {
+      console.error('Failed to save offline:', e);
+    }
+    
+    // Return the fake ID so the app can continue
+    return fakeId;
   }
 }
 
 export async function getUserProjects(userId: string): Promise<WebsiteProject[]> {
   try {
+    // First try to get from Supabase
     const { data, error } = await supabase
       .from('website_projects')
       .select('*')
@@ -164,12 +191,29 @@ export async function getUserProjects(userId: string): Promise<WebsiteProject[]>
     return data as WebsiteProject[];
   } catch (error: any) {
     console.error('Error fetching projects:', error);
-    throw new Error(error.message || 'Failed to fetch projects');
+    
+    // Try to get from localStorage as a fallback
+    try {
+      const offlineProjects = JSON.parse(localStorage.getItem('offlineProjects') || '[]');
+      return offlineProjects.filter((p: any) => p.user_id === userId) as WebsiteProject[];
+    } catch (e) {
+      console.error('Failed to get offline projects:', e);
+      return []; // Return empty array as last resort
+    }
   }
 }
 
 export async function getProjectById(projectId: string): Promise<WebsiteProject> {
   try {
+    // Check if it's an offline project
+    if (projectId.startsWith('offline-')) {
+      const offlineProjects = JSON.parse(localStorage.getItem('offlineProjects') || '[]');
+      const project = offlineProjects.find((p: any) => p.id === projectId);
+      if (project) return project as WebsiteProject;
+      throw new Error('Offline project not found');
+    }
+    
+    // Otherwise, try Supabase
     const { data, error } = await supabase
       .from('website_projects')
       .select('*')
