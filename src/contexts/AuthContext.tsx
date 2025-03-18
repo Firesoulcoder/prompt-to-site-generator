@@ -4,6 +4,10 @@ import { supabase } from '@/lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import { useToast } from '@/components/ui/use-toast';
 
+// Fake user credentials
+const FAKE_EMAIL = 'example@outlook.com';
+const FAKE_PASSWORD = '1234';
+
 type AuthContextType = {
   session: Session | null;
   user: User | null;
@@ -44,6 +48,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string) => {
     try {
       setLoading(true);
+      
+      // Check if using fake credentials
+      if (email === FAKE_EMAIL && password === FAKE_PASSWORD) {
+        // Create a fake user object
+        const fakeUser = {
+          id: 'fake-user-id',
+          email: FAKE_EMAIL,
+          user_metadata: { name: 'Example User' },
+          app_metadata: {},
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+        } as unknown as User;
+        
+        setUser(fakeUser);
+        
+        toast({
+          title: "Success!",
+          description: "Fake account created and logged in.",
+        });
+        return;
+      }
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -68,6 +94,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
+      
+      // Check if using fake credentials
+      if (email === FAKE_EMAIL && password === FAKE_PASSWORD) {
+        // Create a fake user object
+        const fakeUser = {
+          id: 'fake-user-id',
+          email: FAKE_EMAIL,
+          user_metadata: { name: 'Example User' },
+          app_metadata: {},
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+        } as unknown as User;
+        
+        setUser(fakeUser);
+        
+        toast({
+          title: "Welcome back!",
+          description: "You've successfully logged in with fake credentials.",
+        });
+        return;
+      }
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -92,6 +140,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       setLoading(true);
+      
+      // If it's our fake user, just clear the state
+      if (user?.email === FAKE_EMAIL) {
+        setUser(null);
+        setSession(null);
+        toast({
+          title: "Logged out",
+          description: "You've been successfully logged out.",
+        });
+        return;
+      }
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       toast({
