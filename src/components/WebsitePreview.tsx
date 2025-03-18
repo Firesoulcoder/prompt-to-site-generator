@@ -23,26 +23,25 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ htmlContent }) => {
     
     try {
       if (iframeRef.current && htmlContent) {
-        const iframe = iframeRef.current;
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        // Create a blob URL instead of directly writing to the iframe document
+        // This prevents cross-origin issues
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const blobUrl = URL.createObjectURL(blob);
         
-        if (iframeDoc) {
-          iframeDoc.open();
-          iframeDoc.write(htmlContent);
-          iframeDoc.close();
-          
-          // Handle iframe load events
-          iframe.onload = () => {
-            setLoading(false);
-          };
-          
-          // Set a timeout in case the onload event doesn't fire
-          setTimeout(() => {
-            setLoading(false);
-          }, 3000);
-        } else {
-          throw new Error('Could not access iframe document');
-        }
+        const iframe = iframeRef.current;
+        iframe.src = blobUrl;
+        
+        // Handle iframe load events
+        iframe.onload = () => {
+          setLoading(false);
+          // Clean up the blob URL after the iframe has loaded
+          URL.revokeObjectURL(blobUrl);
+        };
+        
+        // Set a timeout in case the onload event doesn't fire
+        setTimeout(() => {
+          setLoading(false);
+        }, 3000);
       }
     } catch (err: any) {
       console.error('Error rendering preview:', err);
@@ -51,6 +50,7 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ htmlContent }) => {
       if (err.message?.includes('network') || 
           err.message?.includes('connection') ||
           err.message?.includes('DNS') ||
+          err.message?.includes('cross-origin') ||
           err.name === 'NetworkError') {
         setConnectionIssue(true);
       }
@@ -67,6 +67,13 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ htmlContent }) => {
     }
     
     loadPreview();
+    
+    // Clean up function to handle blob URL when component unmounts
+    return () => {
+      if (iframeRef.current?.src) {
+        URL.revokeObjectURL(iframeRef.current.src);
+      }
+    };
   }, [htmlContent]);
 
   const handleReload = () => {
@@ -128,7 +135,7 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ htmlContent }) => {
           ref={iframeRef}
           title="Website Preview"
           className="w-full h-full border-0"
-          sandbox="allow-scripts"
+          sandbox="allow-scripts allow-same-origin"
         />
       </div>
     </Card>
