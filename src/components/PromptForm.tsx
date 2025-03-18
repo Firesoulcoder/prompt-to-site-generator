@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 
 interface PromptFormProps {
   onGenerate: (prompt: string, title: string) => void;
@@ -15,6 +16,7 @@ interface PromptFormProps {
 const PromptForm: React.FC<PromptFormProps> = ({ onGenerate, loading }) => {
   const [prompt, setPrompt] = useState('');
   const [title, setTitle] = useState('');
+  const [progress, setProgress] = useState(0);
   const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -38,7 +40,30 @@ const PromptForm: React.FC<PromptFormProps> = ({ onGenerate, loading }) => {
       return;
     }
 
+    // Start progress animation
+    setProgress(0);
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 95) {
+          clearInterval(interval);
+          return 95;
+        }
+        return prev + 5;
+      });
+    }, 500);
+
+    // Call the onGenerate function
     onGenerate(prompt, title);
+    
+    // Reset progress when loading is done
+    const checkLoading = setInterval(() => {
+      if (!loading) {
+        clearInterval(interval);
+        clearInterval(checkLoading);
+        setProgress(100);
+        setTimeout(() => setProgress(0), 500);
+      }
+    }, 1000);
   };
 
   return (
@@ -76,6 +101,16 @@ const PromptForm: React.FC<PromptFormProps> = ({ onGenerate, loading }) => {
               disabled={loading}
             />
           </div>
+          
+          {loading && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Generating website...</span>
+                <span>{Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+            </div>
+          )}
         </CardContent>
         <CardFooter>
           <Button 

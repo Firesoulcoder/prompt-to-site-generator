@@ -10,7 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { ArrowRight, Download, SaveIcon } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ArrowRight, Download, RefreshCw, SaveIcon } from 'lucide-react';
 
 const CreateWebsite = () => {
   const [prompt, setPrompt] = useState('');
@@ -18,6 +19,7 @@ const CreateWebsite = () => {
   const [html, setHtml] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -25,24 +27,41 @@ const CreateWebsite = () => {
   const handleGenerate = async (newPrompt: string, newTitle: string) => {
     try {
       setLoading(true);
+      setError(null);
       setPrompt(newPrompt);
       setTitle(newTitle);
       
+      console.log('Generating website with prompt:', newPrompt);
       const generatedHtml = await generateWebsite(newPrompt);
-      setHtml(generatedHtml);
+      
+      if (generatedHtml) {
+        setHtml(generatedHtml);
+        console.log('Website generated successfully');
+        
+        toast({
+          title: "Website generated!",
+          description: "Your website has been generated successfully.",
+        });
+      } else {
+        throw new Error('Failed to generate website content');
+      }
+    } catch (error: any) {
+      console.error('Error in website generation:', error);
+      setError(error.message || 'An unexpected error occurred');
       
       toast({
-        title: "Website generated!",
-        description: "Your website has been generated successfully.",
-      });
-    } catch (error: any) {
-      toast({
         title: "Generation failed",
-        description: error.message,
+        description: error.message || 'Please try again later',
         variant: "destructive",
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    if (prompt && title) {
+      handleGenerate(prompt, title);
     }
   };
 
@@ -51,6 +70,7 @@ const CreateWebsite = () => {
     
     try {
       setIsSaving(true);
+      setError(null);
       const projectId = await saveProject(user.id, prompt, html, title);
       
       toast({
@@ -60,9 +80,12 @@ const CreateWebsite = () => {
       
       navigate(`/project/${projectId}`);
     } catch (error: any) {
+      console.error('Error saving project:', error);
+      setError(error.message || 'Failed to save project');
+      
       toast({
         title: "Save failed",
-        description: error.message,
+        description: error.message || 'Please try again later',
         variant: "destructive",
       });
     } finally {
@@ -94,6 +117,24 @@ const CreateWebsite = () => {
         <main className="flex-grow container py-8">
           <h1 className="text-3xl font-bold mb-6">Create Website</h1>
           
+          {error && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>
+                {error}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleRetry} 
+                  className="ml-2 mt-2"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-1">
               <PromptForm onGenerate={handleGenerate} loading={loading} />
@@ -105,11 +146,11 @@ const CreateWebsite = () => {
                   <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">{title}</h2>
                     <div className="flex gap-2">
-                      <Button variant="outline" onClick={handleDownload} disabled={isSaving}>
+                      <Button variant="outline" onClick={handleDownload} disabled={isSaving || loading}>
                         <Download className="mr-2 h-4 w-4" />
                         Download
                       </Button>
-                      <Button onClick={handleSave} disabled={isSaving} className="bg-brand-indigo hover:bg-brand-indigo/90">
+                      <Button onClick={handleSave} disabled={isSaving || loading} className="bg-brand-indigo hover:bg-brand-indigo/90">
                         <SaveIcon className="mr-2 h-4 w-4" />
                         {isSaving ? 'Saving...' : 'Save Project'}
                       </Button>
