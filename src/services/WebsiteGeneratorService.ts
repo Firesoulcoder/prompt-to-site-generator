@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { WebsiteProject } from '@/lib/supabase';
 
 const API_KEY = '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';
@@ -23,14 +23,14 @@ export async function generateWebsite(prompt: string): Promise<string> {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "deepseek/deepseek-r1:free",
+        "model": "anthropic/claude-3-opus:free",
         "messages": [
           {
             "role": "user",
             "content": fullPrompt
           }
         ],
-        "max_tokens": 4000 // Adding a max token limit to ensure we get a complete response
+        "max_tokens": 4000
       })
     });
 
@@ -51,7 +51,22 @@ export async function generateWebsite(prompt: string): Promise<string> {
       return getFallbackHTML(prompt);
     }
     
-    return data.choices[0].message.content.trim();
+    // Clean up the HTML content to remove markdown code blocks if present
+    let htmlContent = data.choices[0].message.content.trim();
+    
+    // Check if the content starts with markdown code block identifiers and remove them
+    if (htmlContent.startsWith('```html')) {
+      htmlContent = htmlContent.replace(/^```html\n/, '').replace(/```$/, '');
+    } else if (htmlContent.startsWith('```')) {
+      htmlContent = htmlContent.replace(/^```\n/, '').replace(/```$/, '');
+    }
+    
+    // Ensure it has proper DOCTYPE
+    if (!htmlContent.includes('<!DOCTYPE html>')) {
+      htmlContent = '<!DOCTYPE html>\n' + htmlContent;
+    }
+    
+    return htmlContent;
   } catch (error: any) {
     console.error('Error generating website:', error);
     // Return fallback HTML in case of any error
@@ -137,10 +152,6 @@ export async function saveProject(
   title: string
 ): Promise<string> {
   try {
-    // First try to connect to Supabase
-    const testConnection = await supabase.from('website_projects').select('count', { count: 'exact', head: true });
-    
-    // If we got here, connection worked
     const { data, error } = await supabase
       .from('website_projects')
       .insert([
@@ -180,7 +191,6 @@ export async function saveProject(
 
 export async function getUserProjects(userId: string): Promise<WebsiteProject[]> {
   try {
-    // First try to get from Supabase
     const { data, error } = await supabase
       .from('website_projects')
       .select('*')
@@ -225,5 +235,67 @@ export async function getProjectById(projectId: string): Promise<WebsiteProject>
   } catch (error: any) {
     console.error('Error fetching project:', error);
     throw new Error(error.message || 'Failed to fetch project');
+  }
+}
+
+// New function to enhance website with AI
+export async function enhanceWebsite(
+  htmlContent: string, 
+  enhancementPrompt: string
+): Promise<string> {
+  try {
+    console.log('Enhancing website with prompt:', enhancementPrompt);
+    
+    const fullPrompt = `I have this HTML website:
+    
+${htmlContent.substring(0, 1000)}...
+
+Please enhance it based on this instruction: "${enhancementPrompt}".
+Return ONLY the complete, modified HTML code.`;
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${API_KEY}`,
+        "HTTP-Referer": SITE_URL,
+        "X-Title": SITE_NAME,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        "model": "anthropic/claude-3-opus:free",
+        "messages": [
+          {
+            "role": "user",
+            "content": fullPrompt
+          }
+        ],
+        "max_tokens": 4000
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || `Failed to enhance website: HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.choices?.[0]?.message?.content) {
+      throw new Error('Empty response from AI');
+    }
+    
+    // Clean up the HTML content to remove markdown code blocks if present
+    let enhancedHtml = data.choices[0].message.content.trim();
+    
+    if (enhancedHtml.startsWith('```html')) {
+      enhancedHtml = enhancedHtml.replace(/^```html\n/, '').replace(/```$/, '');
+    } else if (enhancedHtml.startsWith('```')) {
+      enhancedHtml = enhancedHtml.replace(/^```\n/, '').replace(/```$/, '');
+    }
+    
+    return enhancedHtml;
+  } catch (error: any) {
+    console.error('Error enhancing website:', error);
+    throw new Error(error.message || 'Failed to enhance website');
   }
 }

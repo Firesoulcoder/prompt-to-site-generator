@@ -1,25 +1,5 @@
 
-import { createClient } from '@supabase/supabase-js';
-
-// These are public keys
-const supabaseUrl = 'https://supabase.lovable.dev';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTl9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
-
-// Create client with auto-retry and timeout settings
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-  },
-  global: {
-    fetch: (url: RequestInfo | URL, init?: RequestInit) => {
-      return fetch(url, init).catch(err => {
-        console.error('Supabase fetch error:', err);
-        throw new Error('Connection to Supabase failed. Please check your network connection.');
-      });
-    },
-  },
-});
+import { supabase } from '@/integrations/supabase/client';
 
 export type WebsiteProject = {
   id: string;

@@ -4,6 +4,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import PromptForm from '@/components/PromptForm';
 import WebsitePreview from '@/components/WebsitePreview';
+import EnhancementChat from '@/components/EnhancementChat';
 import { Button } from '@/components/ui/button';
 import { generateWebsite, saveProject } from '@/services/WebsiteGeneratorService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,7 +12,8 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowRight, Download, RefreshCw, SaveIcon } from 'lucide-react';
+import { ArrowRight, Download, RefreshCw, SaveIcon, Sparkles, Wand2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const CreateWebsite = () => {
   const [prompt, setPrompt] = useState('');
@@ -20,6 +22,7 @@ const CreateWebsite = () => {
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("prompt");
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -37,6 +40,7 @@ const CreateWebsite = () => {
       if (generatedHtml) {
         setHtml(generatedHtml);
         console.log('Website generated successfully');
+        setActiveTab("enhance");
         
         toast({
           title: "Website generated!",
@@ -110,12 +114,16 @@ const CreateWebsite = () => {
     });
   };
 
+  const handleEnhance = (enhancedHtml: string) => {
+    setHtml(enhancedHtml);
+  };
+
   return (
     <ProtectedRoute>
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
         <Navbar />
         <main className="flex-grow container py-8">
-          <h1 className="text-3xl font-bold mb-6">Create Website</h1>
+          <h1 className="text-3xl font-bold mb-6 text-center bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Create Your Dream Website</h1>
           
           {error && (
             <Alert variant="destructive" className="mb-6">
@@ -135,12 +143,31 @@ const CreateWebsite = () => {
             </Alert>
           )}
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1">
-              <PromptForm onGenerate={handleGenerate} loading={loading} />
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            <div className="lg:col-span-2">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="prompt" className="text-sm" data-state={activeTab === "prompt" ? "active" : ""}>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Generate
+                  </TabsTrigger>
+                  <TabsTrigger value="enhance" className="text-sm" data-state={activeTab === "enhance" ? "active" : ""} disabled={!html}>
+                    <Wand2 className="w-4 h-4 mr-2" />
+                    Enhance
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="prompt" className="mt-0">
+                  <PromptForm onGenerate={handleGenerate} loading={loading} />
+                </TabsContent>
+                
+                <TabsContent value="enhance" className="mt-0">
+                  <EnhancementChat htmlContent={html} onEnhance={handleEnhance} />
+                </TabsContent>
+              </Tabs>
             </div>
             
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-3">
               {html ? (
                 <>
                   <div className="flex justify-between items-center mb-4">
@@ -150,20 +177,25 @@ const CreateWebsite = () => {
                         <Download className="mr-2 h-4 w-4" />
                         Download
                       </Button>
-                      <Button onClick={handleSave} disabled={isSaving || loading} className="bg-brand-indigo hover:bg-brand-indigo/90">
+                      <Button onClick={handleSave} disabled={isSaving || loading} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90">
                         <SaveIcon className="mr-2 h-4 w-4" />
                         {isSaving ? 'Saving...' : 'Save Project'}
                       </Button>
                     </div>
                   </div>
-                  <WebsitePreview htmlContent={html} />
+                  <div className="bg-white p-2 rounded-lg shadow-lg border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+                    <WebsitePreview htmlContent={html} />
+                  </div>
                 </>
               ) : (
-                <div className="h-96 md:h-[600px] flex items-center justify-center border border-dashed rounded-lg bg-muted/20">
+                <div className="h-96 md:h-[600px] flex items-center justify-center border border-dashed rounded-lg bg-white/50 backdrop-blur-sm shadow-sm dark:bg-gray-800/50">
                   <div className="text-center p-8">
-                    <h3 className="text-xl font-medium mb-2">No preview yet</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Enter a prompt and generate your website to see a preview here
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center mx-auto mb-4">
+                      <Sparkles className="h-8 w-8 text-white" />
+                    </div>
+                    <h3 className="text-xl font-medium mb-2">Create Your Website</h3>
+                    <p className="text-muted-foreground mb-4 max-w-md">
+                      Enter a prompt describing your ideal website and let AI do the rest. You can then enhance it with additional prompts.
                     </p>
                     <ArrowRight className="h-8 w-8 text-muted-foreground/50 mx-auto transform -rotate-90" />
                   </div>
