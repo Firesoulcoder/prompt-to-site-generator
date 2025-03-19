@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { WebsiteProject } from '@/lib/supabase';
 
@@ -43,11 +44,25 @@ export async function generateWebsite(prompt: string): Promise<string> {
     }
 
     const data = await response.json();
+    console.log('API Response data:', data); // Log the entire response for debugging
+    
+    // Check if the response has the expected structure
+    if (!data || !data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+      console.warn('Unexpected API response format, using fallback HTML');
+      return getFallbackHTML(prompt);
+    }
+    
+    // Check if the first choice exists and has a message with content
+    if (!data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+      console.warn('Missing content in API response, using fallback HTML');
+      return getFallbackHTML(prompt);
+    }
+    
     console.log('Response received, content length:', data.choices[0].message.content.length);
     
-    // Return a fallback HTML if the API fails or returns empty content
-    if (!data.choices?.[0]?.message?.content || data.choices[0].message.content.trim().length < 100) {
-      console.warn('Empty or very short content received, returning fallback HTML');
+    // If the content is empty or very short, return fallback HTML
+    if (data.choices[0].message.content.trim().length < 100) {
+      console.warn('Very short content received, returning fallback HTML');
       return getFallbackHTML(prompt);
     }
     
@@ -279,18 +294,34 @@ Return ONLY the complete, modified HTML code.`;
     }
 
     const data = await response.json();
+    console.log('API Enhancement Response data:', data); // Log the entire response for debugging
     
-    if (!data.choices?.[0]?.message?.content) {
-      throw new Error('Empty response from AI');
+    // Check if the response has the expected structure
+    if (!data || !data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+      throw new Error('Unexpected API response format');
     }
     
-    // Clean up the HTML content to remove markdown code blocks if present
+    // Check if the first choice exists and has a message with content
+    if (!data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+      throw new Error('Missing content in API response');
+    }
+    
     let enhancedHtml = data.choices[0].message.content.trim();
     
     if (enhancedHtml.startsWith('```html')) {
       enhancedHtml = enhancedHtml.replace(/^```html\n/, '').replace(/```$/, '');
     } else if (enhancedHtml.startsWith('```')) {
       enhancedHtml = enhancedHtml.replace(/^```\n/, '').replace(/```$/, '');
+    }
+    
+    // If the enhanced content is too short, return the original
+    if (enhancedHtml.length < 100) {
+      throw new Error('Enhanced content too short, likely invalid');
+    }
+    
+    // Ensure it has proper DOCTYPE
+    if (!enhancedHtml.includes('<!DOCTYPE html>')) {
+      enhancedHtml = '<!DOCTYPE html>\n' + enhancedHtml;
     }
     
     return enhancedHtml;

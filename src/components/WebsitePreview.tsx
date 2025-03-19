@@ -15,6 +15,7 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ htmlContent }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectionIssue, setConnectionIssue] = useState(false);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
   const loadPreview = () => {
     setLoading(true);
@@ -22,20 +23,39 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ htmlContent }) => {
     setConnectionIssue(false);
     
     try {
+      // Clear previous blob URL if exists
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+        setBlobUrl(null);
+      }
+      
       if (iframeRef.current && htmlContent) {
-        // Create a blob URL instead of directly writing to the iframe document
-        // This prevents cross-origin issues
-        const blob = new Blob([htmlContent], { type: 'text/html' });
-        const blobUrl = URL.createObjectURL(blob);
+        console.log("HTML content length:", htmlContent.length);
+        
+        // Remove any ```html markdown wrappers if present
+        let cleanHtml = htmlContent;
+        if (cleanHtml.startsWith('```html')) {
+          cleanHtml = cleanHtml.replace(/^```html\n/, '').replace(/```$/, '');
+        } else if (cleanHtml.startsWith('```')) {
+          cleanHtml = cleanHtml.replace(/^```\n/, '').replace(/```$/, '');
+        }
+        
+        // Ensure proper DOCTYPE for React content
+        if (!cleanHtml.includes('<!DOCTYPE html>')) {
+          cleanHtml = '<!DOCTYPE html>\n' + cleanHtml;
+        }
+        
+        // Create a blob URL
+        const blob = new Blob([cleanHtml], { type: 'text/html' });
+        const newBlobUrl = URL.createObjectURL(blob);
+        setBlobUrl(newBlobUrl);
         
         const iframe = iframeRef.current;
-        iframe.src = blobUrl;
+        iframe.src = newBlobUrl;
         
         // Handle iframe load events
         iframe.onload = () => {
           setLoading(false);
-          // Clean up the blob URL after the iframe has loaded
-          URL.revokeObjectURL(blobUrl);
         };
         
         // Set a timeout in case the onload event doesn't fire
@@ -66,12 +86,16 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ htmlContent }) => {
       setConnectionIssue(true);
     }
     
-    loadPreview();
+    if (htmlContent) {
+      loadPreview();
+    } else {
+      setLoading(false);
+    }
     
     // Clean up function to handle blob URL when component unmounts
     return () => {
-      if (iframeRef.current?.src) {
-        URL.revokeObjectURL(iframeRef.current.src);
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
       }
     };
   }, [htmlContent]);
@@ -79,6 +103,16 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ htmlContent }) => {
   const handleReload = () => {
     loadPreview();
   };
+
+  if (!htmlContent) {
+    return (
+      <Card className="w-full overflow-hidden border shadow-md">
+        <div className="w-full h-96 md:h-[600px] flex items-center justify-center bg-gray-50 dark:bg-gray-800">
+          <p className="text-muted-foreground">No content to preview</p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full overflow-hidden border shadow-md">
@@ -135,7 +169,7 @@ const WebsitePreview: React.FC<WebsitePreviewProps> = ({ htmlContent }) => {
           ref={iframeRef}
           title="Website Preview"
           className="w-full h-full border-0"
-          sandbox="allow-scripts allow-same-origin"
+          sandbox="allow-scripts"
         />
       </div>
     </Card>
